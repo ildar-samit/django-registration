@@ -4,7 +4,7 @@ import random
 import re
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.db import transaction
 from django.template.loader import render_to_string
@@ -70,12 +70,20 @@ class RegistrationManager(models.Manager):
         Create a new, inactive ``User``, generate a
         ``RegistrationProfile`` and email its activation key to the
         ``User``, returning the new ``User``.
+        
+        This requires the ``User`` model to have username, email,
+        and password fields. If you are using a custom ``User`` model
+        in Django 1.5, create a ``User`` manually in your registration view,
+        being sure to set ``is_active = False``, then use the ``create_profile``
+        method instead of ``create_inactive_user``. If you wish to send an
+        activation email, you can call ``send_activation_email`` on the
+        ``RegistrationProfile`` object returned by ``create_profile``.
 
         By default, an activation email will be sent to the new
         user. To disable this, pass ``send_email=False``.
         
         """
-        new_user = User.objects.create_user(username, email, password)
+        new_user = get_user_model().objects.create_user(username, email, password)
         new_user.is_active = False
         new_user.save()
 
@@ -86,7 +94,7 @@ class RegistrationManager(models.Manager):
 
         return new_user
     create_inactive_user = transaction.commit_on_success(create_inactive_user)
-
+    
     def create_profile(self, user):
         """
         Create a ``RegistrationProfile`` for a given
@@ -98,7 +106,7 @@ class RegistrationManager(models.Manager):
         
         """
         salt = hashlib.sha1(str(random.random())).hexdigest()[:5]
-        username = user.username
+        username = user.get_full_name()
         if isinstance(username, unicode):
             username = username.encode('utf-8')
         activation_key = hashlib.sha1(salt+username).hexdigest()
@@ -152,7 +160,7 @@ class RegistrationManager(models.Manager):
                     if not user.is_active:
                         user.delete()
                         profile.delete()
-            except User.DoesNotExist:
+            except get_user_model().DoesNotExist:
                 profile.delete()
 
 class RegistrationProfile(models.Model):
@@ -173,7 +181,8 @@ class RegistrationProfile(models.Model):
     """
     ACTIVATED = u"ALREADY_ACTIVATED"
     
-    user = models.ForeignKey(User, unique=True, verbose_name=_('user'))
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, unique=True,
+                             verbose_name=_('user'))
     activation_key = models.CharField(_('activation key'), max_length=40)
     
     objects = RegistrationManager()
