@@ -10,11 +10,11 @@ class RegistrationAdmin(admin.ModelAdmin):
     actions = ['activate_users', 'resend_activation_email']
     list_display = ('user', 'activation_key_expired')
     raw_id_fields = ['user']
-    search_fields = ('user__username', 'user__first_name', 'user__last_name')
+    search_fields = ('user__get_full_name', 'user__get_short_name')
 
     def activate_users(self, request, queryset):
         """
-        Activates the selected users, if they are not alrady
+        Activates the selected users, if they are not already
         activated.
         
         """
